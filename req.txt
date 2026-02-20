@@ -1,0 +1,11 @@
+fastapi[standard]
+sqlalchemy   
+ipykernel
+dotenv
+
+alembic
+pwdlib[aragon2]
+PyJWT
+redis
+cloudinary
+psycopg2
