@@ -3,9 +3,8 @@ Designing a role-based backend system for E-commerce business.
 
 **Features**
 ---
-- Authentication and Role-based access control
-- Restful CRUD APIs using JWT
-- APIs for authentication, customer and profiles manipulation(till now)
+- Authentication and Role-based access control using JWT
+- Restful CRUD APIs for authentication, customer, profiles, order, product manipulation(till now)
 - Schema validation
 
 **Tech Stack**

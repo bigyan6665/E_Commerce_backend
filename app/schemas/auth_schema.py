@@ -15,7 +15,6 @@ class SignupBase(BaseModel):
     password:str 
     confirm_password:str 
     is_active:bool = Field(default=True)
-    created_date:datetime = Field(default=datetime.now())
 
     @field_validator("confirm_password")
     @classmethod
@@ -26,7 +25,6 @@ class SignupBase(BaseModel):
 
 class AdminCreate(SignupBase):
     admin_create_key:str
-    role: str = Roles.admin
 
 # Base schema with common attributes
 class LoginBase(BaseModel):

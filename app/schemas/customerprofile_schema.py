@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from enum import Enum
 
 class CustomerProfileBase(BaseModel):
@@ -18,7 +18,7 @@ class Operation(str,Enum):
     subtract = "subtract"
 
 class LoyaltyPointsUpdate(BaseModel):
-    points : float
+    points : float = Field(gt=0)
     operation : Operation
 
 class VerificationUpdate(BaseModel):

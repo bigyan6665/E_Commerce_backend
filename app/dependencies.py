@@ -4,6 +4,9 @@ from app.helper import decodeAccessToken
 from app.helper import is_token_blacklisted
 import jwt
 from typing import List
+from app.database.db import get_db
+from sqlalchemy.orm import Session
+from app.database.models.user_models import User
 
 # oauth2_schema = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 oauth2_schema = OAuth2PasswordBearer(tokenUrl="/auth/login/") # tokenUrl = route of login where token is created
@@ -19,14 +22,14 @@ def authenticate_user(token:str = Depends(oauth2_schema)):
         # print(payload)
         return payload
     except Exception:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail=f"Unauthorized token",headers={"Authorization":"Bearer"})
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail=f"Unauthorized token",headers={"WWW-Authenticate":"Bearer"})
 
 # using closure as dependency
 def check_roles(allowed_roles:list[str]):# closure style nested dependency
     def auth(payload:dict = Depends(authenticate_user)):
         role = payload.get("role")
         if role not in allowed_roles:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail=f"{role} are not allowed in this route")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail=f"{role} are not allowed in this route",headers={"WWW-Authenticate":"Bearer"})
     return auth
 
 # using class as dependency
@@ -35,22 +38,31 @@ class PermissionChecker:
     def __init__(self, allowed_roles: List[str]) -> None:
         self.allowed_roles = allowed_roles
 
-    def __call__(self, token: str = Depends(oauth2_schema)) -> None:
+    def __call__(self, token: str = Depends(oauth2_schema),db:Session = Depends(get_db)) -> dict:
         try:
             payload = decodeAccessToken(token) # token authentication
             jti = payload.get("jti")
             if is_token_blacklisted(jti=jti) == 1: # the token is blacklisted but have not passed expiry time
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Unauthorized token"
+                    detail=f"Unauthorized token",
+                    headers={"WWW-Authenticate":"Bearer"}
                 )
-            role = payload.get("role")
+            # to ensure that the user exists, before permitting to any API
+            current_user = db.query(User).filter(User.id == payload.get("id")).first()
+            if current_user is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"User not found",headers={"WWW-Authenticate":"Bearer"}
+                )
+            role = current_user.role
             if role not in self.allowed_roles: #RBAC
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"'{role}' not allowed in this route"
+                    detail=f" '{role}' not allowed in this route",headers={"WWW-Authenticate":"Bearer"}
                 )
         except (jwt.ExpiredSignatureError,jwt.DecodeError): # catch multiple exceptions
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized token")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized token",headers={"WWW-Authenticate":"Bearer"})
         except Exception: # catches other exceptions and propagates it
             raise 
+        return payload

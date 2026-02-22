@@ -1,12 +1,14 @@
 from fastapi import APIRouter, HTTPException, Depends, status
-from app.schemas.auth import SignupBase,LoginBase
+from app.schemas.auth_schema import SignupBase,LoginBase
 from sqlalchemy.orm import Session
 from app.database.db import get_db
-from app.database.models import User
+from app.database.models.user_models import User
 from app.helper import hashPassword,verifyPassword, createAccessToken, blacklist_token,decodeAccessToken,is_token_blacklisted
 from app.dependencies import oauth2_schema
-from app.schemas.apiresponse import APIResponse
-from app.database.models import CustomerProfile
+from app.schemas.apiresponse_schema import APIResponse
+from app.database.models.user_models import CustomerProfile
+from app.dependencies import PermissionChecker
+from app.schemas.auth_schema import Roles
 
 router = APIRouter(prefix="/auth")
 
@@ -25,8 +27,7 @@ def signup(signupDetails:SignupBase, db:Session = Depends(get_db)):
             address = signupDetails.address,
             contact = signupDetails.contact,
             password = hashPassword(signupDetails.password),
-            is_active = signupDetails.is_active,
-            created_date = signupDetails.created_date
+            is_active = signupDetails.is_active
             )
         user.customer_profile = CustomerProfile()
         db.add(user)
@@ -55,7 +56,7 @@ def login(loginDetails:LoginBase,db:Session= Depends(get_db)):
     payload['access_token'] = access_token
     return APIResponse(message="Logged in successfully",success=True,content=payload)
 
-@router.post("/logout/",response_model=APIResponse)
+@router.post("/logout/",response_model=APIResponse,dependencies=[Depends(PermissionChecker(allowed_roles=[Roles.customer]))])
 def logout(token:str = Depends(oauth2_schema)):
     try:
         payload = decodeAccessToken(token=token)
@@ -66,4 +67,4 @@ def logout(token:str = Depends(oauth2_schema)):
             return APIResponse(message="Logged out successfully",success=True)
         return APIResponse(message="Already logged out",success=True)
     except Exception:
-        return APIResponse(message="Unauthorized token",success=False)
+        raise HTTPException(detail="Unauthorized token",status_code=status.HTTP_401_UNAUTHORIZED)
